@@ -43,29 +43,10 @@ interface CharacterModel {
   image_name: string;
 }
 
-const generateUUID = () => {
-  // グローバルな crypto オブジェクトから取得
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-
-  // フォールバック（通常は不要ですが、互換性のために）
-  // 開発環境によっては、crypto.randomUUID() が利用できない場合があります。
-  // その場合は、後述の 'uuid' ライブラリの使用を推奨します。
-  console.warn(
-    "crypto.randomUUID() is not available. Returning a placeholder."
-  );
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0,
-      v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
-
 // 初期値の設定
 const initialCharacter: CharacterModel = {
   user_id: "test",
-  character_id: generateUUID(),
+  character_id: "",
   name: "",
   age: 17,
   personality: "",
@@ -240,15 +221,16 @@ const CharacterForm: React.FC = () => {
     setCharacter((prev) => ({
       ...prev,
       image_name: resStr,
+      character_id: `${modeStr}_${yyyymmddhhmmss}_01`,
     }));
   }, [isEnemy]); // isEnemy が変わると実行
 
   // 入力値変更時のハンドラ
-  const handleChange = (value: string) => {
-    // 数値型の場合はNumberに変換し、それ以外はそのまま
+  const handleChange = (key: string, value: string) => {
     setCharacter((prev) => ({
       ...prev,
-      image_name: value,
+      // 【修正点】動的なキーにはブラケット記法 [key] を使用
+      [key]: value,
     }));
   };
 
@@ -453,7 +435,7 @@ const CharacterForm: React.FC = () => {
             label="画像ファイル名 (image_name)"
             name="image_name"
             handleChange={(e) => {
-              handleChange(e.target.value);
+              handleChange("image_name", e.target.value);
             }}
             character={character}
             disabled
@@ -487,7 +469,7 @@ const CharacterForm: React.FC = () => {
                 label="ユーザーID (user_id)"
                 name="user_id"
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("user_id", e.target.value);
                 }}
                 character={character}
                 disabled
@@ -498,7 +480,7 @@ const CharacterForm: React.FC = () => {
                 label="キャラクターID (character_id)"
                 name="character_id"
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("character_id", e.target.value);
                 }}
                 character={character}
                 disabled
@@ -509,7 +491,7 @@ const CharacterForm: React.FC = () => {
                 label="名前 (name)"
                 name="name"
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("name", e.target.value);
                 }}
                 character={character}
               />
@@ -522,7 +504,7 @@ const CharacterForm: React.FC = () => {
                 min={0}
                 max={100}
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("age", e.target.value);
                 }}
                 character={character}
               />
@@ -539,7 +521,7 @@ const CharacterForm: React.FC = () => {
             label="性格 (personality)"
             name="personality"
             handleChange={(e) => {
-              handleChange(e.target.value);
+              handleChange("personality", e.target.value);
             }}
             character={character}
             multiline
@@ -549,7 +531,7 @@ const CharacterForm: React.FC = () => {
             name="appearance"
             multiline
             handleChange={(e) => {
-              handleChange(e.target.value);
+              handleChange("appearance", e.target.value);
             }}
             character={character}
           />
@@ -558,7 +540,7 @@ const CharacterForm: React.FC = () => {
             name="setting"
             multiline
             handleChange={(e) => {
-              handleChange(e.target.value);
+              handleChange("setting", e.target.value);
             }}
             character={character}
           />
@@ -567,7 +549,7 @@ const CharacterForm: React.FC = () => {
             name="story"
             multiline
             handleChange={(e) => {
-              handleChange(e.target.value);
+              handleChange("story", e.target.value);
             }}
             character={character}
           />
@@ -585,7 +567,7 @@ const CharacterForm: React.FC = () => {
                 name="hp"
                 min={0}
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("hp", e.target.value);
                 }}
                 character={character}
               />
@@ -596,7 +578,7 @@ const CharacterForm: React.FC = () => {
                 name="mp"
                 min={0}
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("mp", e.target.value);
                 }}
                 character={character}
               />
@@ -607,7 +589,7 @@ const CharacterForm: React.FC = () => {
                 name="vit"
                 min={1}
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("vit", e.target.value);
                 }}
                 character={character}
               />
@@ -618,7 +600,7 @@ const CharacterForm: React.FC = () => {
                 name="dex"
                 min={1}
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("dex", e.target.value);
                 }}
                 character={character}
               />
@@ -629,7 +611,7 @@ const CharacterForm: React.FC = () => {
                 name="agi"
                 min={1}
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("agi", e.target.value);
                 }}
                 character={character}
               />
@@ -640,7 +622,7 @@ const CharacterForm: React.FC = () => {
                 name="inte"
                 min={1}
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("inte", e.target.value);
                 }}
                 character={character}
               />
@@ -651,7 +633,7 @@ const CharacterForm: React.FC = () => {
                 name="luc"
                 min={1}
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("luc", e.target.value);
                 }}
                 character={character}
               />
@@ -662,7 +644,7 @@ const CharacterForm: React.FC = () => {
                 name="fri"
                 min={0}
                 handleChange={(e) => {
-                  handleChange(e.target.value);
+                  handleChange("fri", e.target.value);
                 }}
                 character={character}
                 disabled
