@@ -1,4 +1,10 @@
-import React, { useState, type FormEvent, type ChangeEvent } from "react";
+import React, {
+  useState,
+  type FormEvent,
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+} from "react";
 import {
   TextField,
   Button,
@@ -9,9 +15,13 @@ import {
   Paper,
   Divider,
   FormControlLabel,
-  Switch,
+  Radio,
+  FormControl,
+  FormLabel,
+  RadioGroup,
 } from "@mui/material";
-
+import { CloudUpload as CloudUploadIcon } from "@mui/icons-material";
+import { useDropzone } from "react-dropzone";
 // C#のCharacterModelクラスに対応するTypeScriptの型定義
 interface CharacterModel {
   user_id: string;
@@ -57,7 +67,7 @@ const initialCharacter: CharacterModel = {
   user_id: "test",
   character_id: generateUUID(),
   name: "",
-  age: 0,
+  age: 17,
   personality: "",
   appearance: "",
   setting: "",
@@ -75,6 +85,8 @@ const initialCharacter: CharacterModel = {
 
 // ダミーのAPIエンドポイント
 const REGIST_API_URL = "https://register-character-a42evidd3q-uc.a.run.app";
+const THINK_API_URL =
+  "https://generate-character-from-image-a42evidd3q-uc.a.run.app";
 
 // --- 💡 修正箇所: ヘルパーコンポーネントを外出し ---
 
@@ -152,21 +164,91 @@ const StringField = ({
 );
 const CharacterForm: React.FC = () => {
   const [character, setCharacter] = useState<CharacterModel>(initialCharacter);
+  const [isAIthinking, setIsAIthinking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isEnemy, setIsEnemy] = useState(false);
+  const [isEnemy, setIsEnemy] = useState<boolean | null>(null);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [aiThinkMessage, setAIThinkMessage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    // 複数ファイルがドロップされた場合でも最初の1つだけを処理
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      if (
+        file.type === "image/png" ||
+        file.name.endsWith(".png") ||
+        file.type === "image/jpg" ||
+        file.name.endsWith(".jpg")
+      ) {
+        setSelectedFile(file);
 
-  // 入力値変更時のハンドラ
-  const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value, type } = e.target;
+        //プロンプト抽出
+        // FileReaderインスタンスを作成
+        const reader = new FileReader();
+
+        // ファイル読み込みが完了したときのイベントハンドラ
+        reader.onload = (event: ProgressEvent<FileReader>) => {
+          // 数値型の場合はNumberに変換し、それ以外はそのまま
+          setCharacter((prev) => ({
+            ...prev,
+            image_file: file,
+          }));
+          console.log(event.target);
+        };
+      }
+    }
+  }, []);
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+
+  // 依存配列に isEnemy を設定することで、変更時に自動実行される
+  useEffect(() => {
+    if (isEnemy == null) return;
+    // DesideImageName のロジックをここに書く
+    const modeStr = isEnemy ? "enemy" : "fixed";
+    const now = new Date();
+    // 1. 年 (YYYY) を取得
+    const year = now.getFullYear();
+
+    // 2. 月 (MM) を取得し、+1してゼロ埋め
+    // getMonth() は 0-11 を返すため、1を足してからゼロ埋めします
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+
+    // 3. 日 (DD) を取得し、ゼロ埋め
+    // getDate() は 1-31 を返す
+    const day = String(now.getDate()).padStart(2, "0");
+
+    // 4. 時 (HH) を取得し、ゼロ埋め
+    // getHours() は 0-24 を返す
+    const hours = String(now.getHours()).padStart(2, "0");
+
+    // 5. 分 (mm) を取得し、ゼロ埋め
+    // getMinutes() は 0-60 を返す
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+
+    // 6. 秒 (ss) を取得し、ゼロ埋め
+    // getSeconds() は 0-60 を返す
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+
+    // 7. 全てを結合して yyyymmddhhmmss 形式の文字列を作成
+    const yyyymmddhhmmss = `${year}${month}${day}${hours}${minutes}${seconds}`;
+
+    let exStr = `png`;
+    if (selectedFile?.name.includes("jpg")) exStr = `jpg`;
+    if (selectedFile?.name.includes("png")) exStr = `png`;
+    const resStr = `${modeStr}_${yyyymmddhhmmss}_01.${exStr}`;
     // 数値型の場合はNumberに変換し、それ以外はそのまま
-    const newValue = type === "number" ? Number(value) : value;
-
     setCharacter((prev) => ({
       ...prev,
-      [name]: newValue,
+      image_name: resStr,
+    }));
+  }, [isEnemy]); // isEnemy が変わると実行
+
+  // 入力値変更時のハンドラ
+  const handleChange = (value: string) => {
+    // 数値型の場合はNumberに変換し、それ以外はそのまま
+    setCharacter((prev) => ({
+      ...prev,
+      image_name: value,
     }));
   };
 
@@ -175,15 +257,20 @@ const CharacterForm: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitMessage(null);
-
+    // --- 1. FormData オブジェクトの作成 ---
+    const formData = new FormData();
+    // Python側で request.form.get('data') で取得し、JSON.parse()でパースされます
+    formData.append("data", JSON.stringify(character));
+    // 💡 画像ファイルそのものを 'image' キーで追加
+    // Python側で request.files.get('image') で FileStorage オブジェクトとして取得されます
+    if (selectedFile) {
+      formData.append("image_file", selectedFile);
+    }
     try {
       // ダミーAPIへのPOST送信処理
       const response = await fetch(REGIST_API_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(character),
+        body: formData,
       });
 
       if (response.ok) {
@@ -208,6 +295,62 @@ const CharacterForm: React.FC = () => {
     }
   };
 
+  // フォーム送信時のハンドラ (POST送信をシミュレート)
+  const aiThinkSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsAIthinking(true);
+    setAIThinkMessage(null);
+    // --- 1. FormData オブジェクトの作成 ---
+    const formData = new FormData();
+    // Python側で request.form.get('data') で取得し、JSON.parse()でパースされます
+    formData.append("data", JSON.stringify(character));
+    // 💡 画像ファイルそのものを 'image' キーで追加
+    // Python側で request.files.get('image') で FileStorage オブジェクトとして取得されます
+    if (selectedFile) {
+      formData.append("image_file", selectedFile);
+    }
+    try {
+      // ダミーAPIへのPOST送信処理
+      const response = await fetch(THINK_API_URL, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        // 成功時の処理
+        const jsonResponse = await response.json();
+        console.log("API Response:");
+        const resModel = JSON.parse(jsonResponse);
+        console.log(resModel);
+        const newModel: CharacterModel = {
+          user_id: character.user_id,
+          character_id: character.character_id,
+          image_name: character.image_name,
+          ...resModel,
+        };
+        console.log(newModel);
+
+        //キャラクターに反映
+        setCharacter(newModel);
+
+        setAIThinkMessage("AIはキャラクターを考えて、画面に反映した！");
+        // フォームをリセットしたい場合は以下の行を有効化
+        // setCharacter(initialCharacter);
+      } else {
+        // 失敗時の処理
+        setAIThinkMessage(
+          `AIは考えることに失敗しました。ステータス: ${response.status}`
+        );
+      }
+    } catch (error) {
+      // エラー時の処理
+      console.error("Submission Error:", error);
+      setAIThinkMessage("❌ ネットワークエラーが発生しました。");
+    } finally {
+      setIsAIthinking(false);
+    }
+  };
+
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
@@ -218,7 +361,7 @@ const CharacterForm: React.FC = () => {
           align="center"
           color="primary"
         >
-          💖 美少女カードゲーム キャラクターモデル登録
+          美少女カードゲーム キャラクターモデル登録
         </Typography>
         <Typography
           variant="subtitle1"
@@ -229,17 +372,123 @@ const CharacterForm: React.FC = () => {
           全項目必須入力です。
         </Typography>
 
+        {/* 必須項目 */}
+        <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
+          【必須項目】
+        </Typography>
+        <Container>
+          <Grid container spacing={4}>
+            <Grid>
+              {/* ファイルドロップゾーン */}
+              <Box
+                {...getRootProps()}
+                sx={{
+                  border: "2px dashed",
+                  borderColor: isDragActive ? "primary.main" : "grey.400",
+                  borderRadius: 2,
+                  p: 4,
+                  mb: 3,
+                  backgroundColor: isDragActive ? "primary.light" : "grey.50",
+                  transition: "background-color 0.3s ease-in-out",
+                  cursor: "pointer",
+                  "&:hover": {
+                    borderColor: "primary.dark",
+                  },
+                }}
+              >
+                <input {...getInputProps()} />
+                <CloudUploadIcon
+                  sx={{ fontSize: 60, color: "grey.500", mb: 1 }}
+                />
+                {isDragActive ? (
+                  <Typography variant="h6" color="primary.main">
+                    ここにファイルをドロップしてください...
+                  </Typography>
+                ) : (
+                  <Typography variant="h6" color="text.secondary">
+                    ファイルをドラッグ＆ドロップするか、クリックして選択
+                  </Typography>
+                )}
+                <Typography variant="body2" color="text.secondary">
+                  （.png or .jpg 形式のみ）
+                </Typography>
+              </Box>
+            </Grid>
+            {/* 選択されたファイル表示 */}
+            {selectedFile && (
+              <Grid>
+                <img
+                  src={URL.createObjectURL(selectedFile)}
+                  alt="Preview"
+                  style={{ maxWidth: "100%", maxHeight: "100%" }}
+                />
+              </Grid>
+            )}
+          </Grid>
+        </Container>
+        <Container sx={{ textAlign: "left" }}>
+          <FormControl>
+            <FormLabel id="mode-radio-buttons-group-label">
+              このキャラクターは敵ですか？味方ですか？
+            </FormLabel>
+            <RadioGroup
+              aria-labelledby="mode-radio-buttons-group-label"
+              name="radio-buttons-group"
+              onChange={(e) => {
+                setIsEnemy(e.target.value == "true");
+              }}
+            >
+              <FormControlLabel value="true" control={<Radio />} label="敵" />
+              <FormControlLabel
+                value="false"
+                control={<Radio />}
+                label="味方"
+              />
+            </RadioGroup>
+          </FormControl>
+          <br />
+        </Container>
+        {character.image_name && (
+          <StringField
+            label="画像ファイル名 (image_name)"
+            name="image_name"
+            handleChange={(e) => {
+              handleChange(e.target.value);
+            }}
+            character={character}
+            disabled
+          />
+        )}
+        <Divider sx={{ my: 3 }} />
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
           {/* 1. 基本情報 */}
           <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-            📋 基本情報
+            【基本情報】
           </Typography>
+          {character.image_name && (
+            <Container sx={{ textAlign: "left" }}>
+              {/* AI思考ボタン */}
+              <Button
+                variant="contained"
+                color="secondary"
+                size="large"
+                disabled={isAIthinking}
+                sx={{ mt: 2, mb: 2, width: 150 }}
+                onClick={aiThinkSubmit}
+              >
+                {isAIthinking ? "AIが作成中…" : "AIで作成"}
+              </Button>
+              <Box>{aiThinkMessage && <span>{aiThinkMessage}</span>}</Box>
+            </Container>
+          )}
           <Grid container spacing={2}>
             <Grid>
               <StringField
                 label="ユーザーID (user_id)"
                 name="user_id"
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
                 disabled
               />
@@ -248,7 +497,9 @@ const CharacterForm: React.FC = () => {
               <StringField
                 label="キャラクターID (character_id)"
                 name="character_id"
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
                 disabled
               />
@@ -257,7 +508,9 @@ const CharacterForm: React.FC = () => {
               <StringField
                 label="名前 (name)"
                 name="name"
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
               />
             </Grid>
@@ -268,7 +521,9 @@ const CharacterForm: React.FC = () => {
                 name="age"
                 min={0}
                 max={100}
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
               />
             </Grid>
@@ -278,12 +533,14 @@ const CharacterForm: React.FC = () => {
 
           {/* 2. 詳細設定 (すべてstring型だが、複数行のTextAreaとして扱う) */}
           <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-            📜 詳細設定
+            【詳細設定】
           </Typography>
           <StringField
             label="性格 (personality)"
             name="personality"
-            handleChange={handleChange}
+            handleChange={(e) => {
+              handleChange(e.target.value);
+            }}
             character={character}
             multiline
           />
@@ -291,21 +548,27 @@ const CharacterForm: React.FC = () => {
             label="外見 (appearance)"
             name="appearance"
             multiline
-            handleChange={handleChange}
+            handleChange={(e) => {
+              handleChange(e.target.value);
+            }}
             character={character}
           />
           <StringField
             label="設定・背景 (setting)"
             name="setting"
             multiline
-            handleChange={handleChange}
+            handleChange={(e) => {
+              handleChange(e.target.value);
+            }}
             character={character}
           />
           <StringField
             label="物語・ストーリー (story)"
             name="story"
             multiline
-            handleChange={handleChange}
+            handleChange={(e) => {
+              handleChange(e.target.value);
+            }}
             character={character}
           />
 
@@ -321,7 +584,9 @@ const CharacterForm: React.FC = () => {
                 label="HP (hp)"
                 name="hp"
                 min={0}
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
               />
             </Grid>
@@ -330,7 +595,9 @@ const CharacterForm: React.FC = () => {
                 label="MP (mp)"
                 name="mp"
                 min={0}
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
               />
             </Grid>
@@ -339,7 +606,9 @@ const CharacterForm: React.FC = () => {
                 label="VIT / 体力 (vit)"
                 name="vit"
                 min={1}
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
               />
             </Grid>
@@ -348,7 +617,9 @@ const CharacterForm: React.FC = () => {
                 label="DEX / 器用さ (dex)"
                 name="dex"
                 min={1}
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
               />
             </Grid>
@@ -357,7 +628,9 @@ const CharacterForm: React.FC = () => {
                 label="AGI / 素早さ (agi)"
                 name="agi"
                 min={1}
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
               />
             </Grid>
@@ -366,7 +639,9 @@ const CharacterForm: React.FC = () => {
                 label="INTE / 知性 (inte)"
                 name="inte"
                 min={1}
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
               />
             </Grid>
@@ -375,7 +650,9 @@ const CharacterForm: React.FC = () => {
                 label="LUC / 運 (luc)"
                 name="luc"
                 min={1}
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
               />
             </Grid>
@@ -384,7 +661,9 @@ const CharacterForm: React.FC = () => {
                 label="FRI / 友好度 (fri)"
                 name="fri"
                 min={0}
-                handleChange={handleChange}
+                handleChange={(e) => {
+                  handleChange(e.target.value);
+                }}
                 character={character}
                 disabled
               />
@@ -392,35 +671,6 @@ const CharacterForm: React.FC = () => {
           </Grid>
 
           <Divider sx={{ my: 3 }} />
-
-          {/* 4. その他 */}
-          <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-            🖼️ その他
-          </Typography>
-          <Container sx={{ textAlign: "left" }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  onChange={(_, checked) => {
-                    setIsEnemy(checked);
-                  }}
-                  defaultChecked
-                />
-              }
-              label="味方 ←→ 敵"
-            />
-            <span>
-              <b>画像名に「{isEnemy ? "enemy" : "fixed"}」を含めてください</b>
-            </span>
-            <br />
-          </Container>
-          <StringField
-            label="画像ファイル名 (image_name)"
-            name="image_name"
-            handleChange={handleChange}
-            character={character}
-          />
-
           {/* 送信ボタン */}
           <Button
             type="submit"
