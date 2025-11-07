@@ -19,6 +19,8 @@ import {
   FormControl,
   FormLabel,
   RadioGroup,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { CloudUpload as CloudUploadIcon } from "@mui/icons-material";
 import { useDropzone } from "react-dropzone";
@@ -28,6 +30,7 @@ interface CharacterModel {
   character_id: string;
   name: string;
   age: number;
+  attribute: string;
   personality: string;
   appearance: string;
   setting: string;
@@ -49,6 +52,7 @@ const initialCharacter: CharacterModel = {
   character_id: "",
   name: "",
   age: 17,
+  attribute: "None",
   personality: "",
   appearance: "",
   setting: "",
@@ -226,7 +230,7 @@ const CharacterForm: React.FC = () => {
   }, [isEnemy]); // isEnemy が変わると実行
 
   // 入力値変更時のハンドラ
-  const handleChange = (key: string, value: string) => {
+  const handleChange = (key: string, value: string | number) => {
     setCharacter((prev) => ({
       ...prev,
       // 【修正点】動的なキーにはブラケット記法 [key] を使用
@@ -429,6 +433,32 @@ const CharacterForm: React.FC = () => {
             </RadioGroup>
           </FormControl>
           <br />
+          属性を選択してください。
+          <br />
+          <Select
+            sx={{ width: 200 }}
+            name={"attribute"}
+            value={character.attribute}
+            defaultValue={"None"}
+            onChange={(e) => {
+              setCharacter((prev) => ({
+                ...prev,
+                // 【修正点】動的なキーにはブラケット記法 [key] を使用
+                ["attribute"]: e.target.value ?? "None",
+              }));
+            }}
+          >
+            <MenuItem value={"None"}>無</MenuItem>
+            <MenuItem value={"Fire"}>火</MenuItem>
+            <MenuItem value={"Water"}>水</MenuItem>
+            <MenuItem value={"Thunder"}>雷</MenuItem>
+            <MenuItem value={"Wood"}>木</MenuItem>
+            <MenuItem value={"Wind"}>風</MenuItem>
+            <MenuItem value={"Ice"}>氷</MenuItem>
+            <MenuItem value={"Ground"}>地</MenuItem>
+            <MenuItem value={"Light"}>光</MenuItem>
+            <MenuItem value={"Dark"}>闇</MenuItem>
+          </Select>
         </Container>
         {character.image_name && (
           <StringField
@@ -502,9 +532,8 @@ const CharacterForm: React.FC = () => {
                 label="年齢 (age)"
                 name="age"
                 min={0}
-                max={100}
                 handleChange={(e) => {
-                  handleChange("age", e.target.value);
+                  handleChange("age", Number.parseInt(e.target.value));
                 }}
                 character={character}
               />
@@ -567,7 +596,7 @@ const CharacterForm: React.FC = () => {
                 name="hp"
                 min={0}
                 handleChange={(e) => {
-                  handleChange("hp", e.target.value);
+                  handleChange("hp", Number.parseInt(e.target.value));
                 }}
                 character={character}
               />
@@ -578,7 +607,7 @@ const CharacterForm: React.FC = () => {
                 name="mp"
                 min={0}
                 handleChange={(e) => {
-                  handleChange("mp", e.target.value);
+                  handleChange("mp", Number.parseInt(e.target.value));
                 }}
                 character={character}
               />
@@ -589,7 +618,7 @@ const CharacterForm: React.FC = () => {
                 name="vit"
                 min={1}
                 handleChange={(e) => {
-                  handleChange("vit", e.target.value);
+                  handleChange("vit", Number.parseInt(e.target.value));
                 }}
                 character={character}
               />
@@ -600,7 +629,7 @@ const CharacterForm: React.FC = () => {
                 name="dex"
                 min={1}
                 handleChange={(e) => {
-                  handleChange("dex", e.target.value);
+                  handleChange("dex", Number.parseInt(e.target.value));
                 }}
                 character={character}
               />
@@ -611,7 +640,7 @@ const CharacterForm: React.FC = () => {
                 name="agi"
                 min={1}
                 handleChange={(e) => {
-                  handleChange("agi", e.target.value);
+                  handleChange("agi", Number.parseInt(e.target.value));
                 }}
                 character={character}
               />
@@ -622,7 +651,7 @@ const CharacterForm: React.FC = () => {
                 name="inte"
                 min={1}
                 handleChange={(e) => {
-                  handleChange("inte", e.target.value);
+                  handleChange("inte", Number.parseInt(e.target.value));
                 }}
                 character={character}
               />
@@ -633,7 +662,7 @@ const CharacterForm: React.FC = () => {
                 name="luc"
                 min={1}
                 handleChange={(e) => {
-                  handleChange("luc", e.target.value);
+                  handleChange("luc", Number.parseInt(e.target.value));
                 }}
                 character={character}
               />
@@ -644,7 +673,7 @@ const CharacterForm: React.FC = () => {
                 name="fri"
                 min={0}
                 handleChange={(e) => {
-                  handleChange("fri", e.target.value);
+                  handleChange("fri", Number.parseInt(e.target.value));
                 }}
                 character={character}
                 disabled
